@@ -1,0 +1,526 @@
+THIS SHOULD BE A LINTER ERROR<!doctype html>
+<html lang="zh-CN" data-framework="javascript">
+<head>
+<title>Cimbar 解码器</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no">
+<link rel="manifest" href="pwa.json">
+</head>
+<body>
+
+<style>
+* {
+	margin: 0;
+	padding: 0;
+}
+
+html, body {
+	height: 100vh;
+}
+
+body {
+	background-color: #1a1a1a;
+	color: #f0f0f0;
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	transition: opacity 0.4s ease-in;
+}
+
+.container {
+	width: 90%;
+	max-width: 800px;
+	text-align: center;
+}
+
+.header {
+	margin-bottom: 2rem;
+}
+
+.header h1 {
+	font-size: 2.5rem;
+	margin-bottom: 0.5rem;
+	color: #00ff00;
+	text-shadow: 0 0 10px #00ff00;
+}
+
+.header p {
+	font-size: 1.1rem;
+	color: #ccc;
+	margin-bottom: 2rem;
+}
+
+.upload-area {
+	border: 3px dashed #00ff00;
+	border-radius: 10px;
+	padding: 3rem;
+	margin: 2rem 0;
+	background: rgba(0, 255, 0, 0.05);
+	transition: all 0.3s ease;
+	cursor: pointer;
+}
+
+.upload-area:hover {
+	border-color: #00cc00;
+	background: rgba(0, 255, 0, 0.1);
+}
+
+.upload-area.dragover {
+	border-color: #ffff00;
+	background: rgba(255, 255, 0, 0.1);
+}
+
+.upload-text {
+	font-size: 1.5rem;
+	margin-bottom: 1rem;
+	color: #00ff00;
+}
+
+.upload-subtext {
+	font-size: 1rem;
+	color: #999;
+}
+
+.file-input {
+	display: none;
+}
+
+.controls {
+	margin: 2rem 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	justify-content: center;
+}
+
+.btn {
+	padding: 0.8rem 1.5rem;
+	border: 2px solid #00ff00;
+	background: transparent;
+	color: #00ff00;
+	border-radius: 5px;
+	cursor: pointer;
+	font-size: 1rem;
+	transition: all 0.3s ease;
+}
+
+.btn:hover {
+	background: #00ff00;
+	color: #000;
+}
+
+.btn:disabled {
+	border-color: #666;
+	color: #666;
+	cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+	background: transparent;
+	color: #666;
+}
+
+.status {
+	margin: 2rem 0;
+	padding: 1rem;
+	border-radius: 5px;
+	min-height: 60px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1.1rem;
+}
+
+.status.info {
+	background: rgba(0, 255, 0, 0.1);
+	border: 1px solid #00ff00;
+	color: #00ff00;
+}
+
+.status.error {
+	background: rgba(255, 0, 0, 0.1);
+	border: 1px solid #ff0000;
+	color: #ff0000;
+}
+
+.status.success {
+	background: rgba(0, 255, 0, 0.1);
+	border: 1px solid #00ff00;
+	color: #00ff00;
+}
+
+.progress {
+	width: 100%;
+	height: 20px;
+	background: #333;
+	border-radius: 10px;
+	overflow: hidden;
+	margin: 1rem 0;
+}
+
+.progress-bar {
+	height: 100%;
+	background: linear-gradient(90deg, #00ff00, #00cc00);
+	width: 0%;
+	transition: width 0.3s ease;
+}
+
+.preview {
+	margin: 2rem 0;
+	max-width: 100%;
+}
+
+.preview img {
+	max-width: 100%;
+	max-height: 300px;
+	border-radius: 5px;
+	border: 2px solid #00ff00;
+}
+
+.results {
+	margin: 2rem 0;
+	text-align: left;
+}
+
+.results h3 {
+	color: #00ff00;
+	margin-bottom: 1rem;
+}
+
+.results pre {
+	background: #333;
+	padding: 1rem;
+	border-radius: 5px;
+	overflow-x: auto;
+	color: #ccc;
+}
+
+.download-link {
+	display: inline-block;
+	margin: 1rem 0;
+	padding: 0.8rem 1.5rem;
+	background: #00ff00;
+	color: #000;
+	text-decoration: none;
+	border-radius: 5px;
+	transition: all 0.3s ease;
+}
+
+.download-link:hover {
+	background: #00cc00;
+	transform: translateY(-2px);
+}
+
+.hidden {
+	display: none;
+}
+
+@media (max-width: 768px) {
+	.container {
+		width: 95%;
+	}
+	
+	.header h1 {
+		font-size: 2rem;
+	}
+	
+	.upload-area {
+		padding: 2rem 1rem;
+	}
+	
+	.controls {
+		flex-direction: column;
+		align-items: center;
+	}
+}
+</style>
+
+<div class="container">
+	<div class="header">
+		<h1>🔍 Cimbar 解码器</h1>
+		<p>上传cimbar视频帧图像进行解码</p>
+	</div>
+
+	<div class="upload-area" id="uploadArea">
+		<div class="upload-text">📁 拖拽文件到此处或点击选择</div>
+		<div class="upload-subtext">支持PNG、JPG、JPEG格式的cimbar帧图像</div>
+		<input type="file" id="fileInput" class="file-input" accept="image/*" multiple>
+	</div>
+
+	<div class="controls">
+		<button class="btn" id="selectFilesBtn">选择文件</button>
+		<button class="btn" id="decodeBtn" disabled>开始解码</button>
+		<button class="btn" id="clearBtn">清除</button>
+	</div>
+
+	<div class="status info hidden" id="status">
+		<div id="statusText">准备就绪</div>
+	</div>
+
+	<div class="progress hidden" id="progress">
+		<div class="progress-bar" id="progressBar"></div>
+	</div>
+
+	<div class="preview hidden" id="preview">
+		<img id="previewImage" alt="预览图像">
+	</div>
+
+	<div class="results hidden" id="results">
+		<h3>解码结果</h3>
+		<div id="resultsContent"></div>
+	</div>
+</div>
+
+<script>
+class CimbarDecoder {
+	constructor() {
+		this.files = [];
+		this.isDecoding = false;
+		this.init();
+	}
+
+	init() {
+		this.bindEvents();
+		this.updateStatus('准备就绪，请选择cimbar帧图像文件', 'info');
+	}
+
+	bindEvents() {
+		const uploadArea = document.getElementById('uploadArea');
+		const fileInput = document.getElementById('fileInput');
+		const selectFilesBtn = document.getElementById('selectFilesBtn');
+		const decodeBtn = document.getElementById('decodeBtn');
+		const clearBtn = document.getElementById('clearBtn');
+
+		// 文件选择
+		uploadArea.addEventListener('click', () => fileInput.click());
+		selectFilesBtn.addEventListener('click', () => fileInput.click());
+		fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+
+		// 拖拽上传
+		uploadArea.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			uploadArea.classList.add('dragover');
+		});
+
+		uploadArea.addEventListener('dragleave', () => {
+			uploadArea.classList.remove('dragover');
+		});
+
+		uploadArea.addEventListener('drop', (e) => {
+			e.preventDefault();
+			uploadArea.classList.remove('dragover');
+			this.handleFileDrop(e);
+		});
+
+		// 解码和清除
+		decodeBtn.addEventListener('click', () => this.startDecode());
+		clearBtn.addEventListener('click', () => this.clearAll());
+	}
+
+	handleFileSelect(event) {
+		const files = Array.from(event.target.files);
+		this.addFiles(files);
+	}
+
+	handleFileDrop(event) {
+		const files = Array.from(event.dataTransfer.files);
+		this.addFiles(files);
+	}
+
+	addFiles(newFiles) {
+		const imageFiles = newFiles.filter(file => 
+			file.type.startsWith('image/') && 
+			['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)
+		);
+
+		if (imageFiles.length === 0) {
+			this.updateStatus('请选择有效的图像文件（PNG、JPG、JPEG）', 'error');
+			return;
+		}
+
+		this.files = [...this.files, ...imageFiles];
+		this.updateFileList();
+		this.updateStatus(`已选择 ${this.files.length} 个文件`, 'info');
+		this.updateDecodeButton();
+		this.showPreview(imageFiles[0]);
+	}
+
+	updateFileList() {
+		const uploadText = document.querySelector('.upload-text');
+		uploadText.textContent = `已选择 ${this.files.length} 个文件`;
+	}
+
+	updateDecodeButton() {
+		const decodeBtn = document.getElementById('decodeBtn');
+		decodeBtn.disabled = this.files.length === 0 || this.isDecoding;
+	}
+
+	showPreview(file) {
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			const preview = document.getElementById('preview');
+			const previewImage = document.getElementById('previewImage');
+			previewImage.src = e.target.result;
+			preview.classList.remove('hidden');
+		};
+		reader.readAsDataURL(file);
+	}
+
+	async startDecode() {
+		if (this.files.length === 0) {
+			this.updateStatus('请先选择文件', 'error');
+			return;
+		}
+
+		this.isDecoding = true;
+		this.updateDecodeButton();
+		this.showProgress();
+		this.updateStatus('正在初始化解码器...', 'info');
+
+		try {
+			// 初始化WebAssembly解码器
+			if (!this.wasmDecoder) {
+				this.wasmDecoder = new CimbarWasmDecoder();
+				await this.wasmDecoder.init();
+			}
+
+			this.updateStatus('正在解码...', 'info');
+			await this.performDecode();
+			
+			this.updateStatus('解码完成！', 'success');
+			this.showResults();
+		} catch (error) {
+			this.updateStatus(`解码失败: ${error.message}`, 'error');
+		} finally {
+			this.isDecoding = false;
+			this.updateDecodeButton();
+			this.hideProgress();
+		}
+	}
+
+	async performDecode() {
+		const totalSteps = this.files.length;
+		let currentStep = 0;
+		let decodedData = null;
+
+		// 配置解码器
+		this.wasmDecoder.configure(2, 3, true); // ECC=2, ColorBits=3, Fountain=true
+
+		// 处理每个文件
+		for (let i = 0; i < this.files.length; i++) {
+			const file = this.files[i];
+			
+			try {
+				// 将文件转换为ArrayBuffer
+				const arrayBuffer = await this.wasmDecoder.fileToArrayBuffer(file);
+				
+				// 解码图像
+				const result = await this.wasmDecoder.decodeImage(arrayBuffer, 'decoded_output');
+				
+				if (result.success) {
+					decodedData = result.decodedData;
+					
+					// 检查是否解码完成
+					if (this.wasmDecoder.decoder.isDecodingComplete()) {
+						break;
+					}
+				}
+			} catch (error) {
+				console.warn(`Failed to decode file ${file.name}:`, error);
+			}
+			
+			currentStep++;
+			this.updateProgress((currentStep / totalSteps) * 100);
+		}
+
+		// 保存解码结果
+		if (decodedData) {
+			this.decodedResult = decodedData;
+			this.createDownloadLink(decodedData);
+		}
+	}
+
+	createDownloadLink(data) {
+		const blob = new Blob([data], { type: 'application/octet-stream' });
+		const url = URL.createObjectURL(blob);
+		this.downloadUrl = url;
+		this.downloadFilename = `decoded_${new Date().getTime()}.bin`;
+	}
+
+	updateProgress(percentage) {
+		const progressBar = document.getElementById('progressBar');
+		progressBar.style.width = `${percentage}%`;
+	}
+
+	showProgress() {
+		document.getElementById('progress').classList.remove('hidden');
+	}
+
+	hideProgress() {
+		document.getElementById('progress').classList.add('hidden');
+	}
+
+	showResults() {
+		const results = document.getElementById('results');
+		const resultsContent = document.getElementById('resultsContent');
+		
+		let resultHtml = `
+			<p><strong>解码完成！</strong></p>
+			<p>处理文件数: ${this.files.length}</p>
+			<p>解码时间: ${new Date().toLocaleTimeString()}</p>
+		`;
+		
+		if (this.decodedResult) {
+			resultHtml += `
+				<p>解码状态: 成功</p>
+				<p>数据大小: ${this.decodedResult.length} 字节</p>
+				<a href="${this.downloadUrl}" download="${this.downloadFilename}" class="download-link">下载解码结果</a>
+			`;
+		} else {
+			resultHtml += `
+				<p>解码状态: 未找到有效数据</p>
+				<p>可能原因: 图像不是有效的cimbar帧，或需要更多帧来完成解码</p>
+			`;
+		}
+		
+		resultsContent.innerHTML = resultHtml;
+		results.classList.remove('hidden');
+	}
+
+	clearAll() {
+		this.files = [];
+		this.isDecoding = false;
+		
+		document.getElementById('fileInput').value = '';
+		document.getElementById('preview').classList.add('hidden');
+		document.getElementById('results').classList.add('hidden');
+		document.getElementById('status').classList.add('hidden');
+		document.getElementById('progress').classList.add('hidden');
+		
+		const uploadText = document.querySelector('.upload-text');
+		uploadText.textContent = '📁 拖拽文件到此处或点击选择';
+		
+		this.updateDecodeButton();
+		this.updateStatus('准备就绪，请选择cimbar帧图像文件', 'info');
+	}
+
+	updateStatus(message, type = 'info') {
+		const status = document.getElementById('status');
+		const statusText = document.getElementById('statusText');
+		
+		status.className = `status ${type}`;
+		statusText.textContent = message;
+		status.classList.remove('hidden');
+	}
+}
+
+// 初始化解码器
+document.addEventListener('DOMContentLoaded', () => {
+	new CimbarDecoder();
+});
+</script>
+
+</body>
+</html>
