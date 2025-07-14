@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>离线 Cimbar 扫描器</title>
+    <link rel="manifest" href="pwa.json">
+    <meta name="theme-color" content="#000000">
+    <link rel="icon" href="favicon.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .scanner-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .scanner-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .camera-section, .upload-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 3px solid #00ff00;
+            border-radius: 10px;
+            width: 80%;
+            height: 80%;
+            pointer-events: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .video-overlay.scanning {
+            border-color: #ffff00;
+            box-shadow: 0 0 20px rgba(255, 255, 0, 0.5);
+        }
+
+        .video-overlay.success {
+            border-color: #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .upload-area {
+            border: 3px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        .upload-area input {
+            display: none;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            opacity: 0.7;
+            font-size: 0.9rem;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.primary {
+            background: #00ff00;
+            color: #000;
+            border-color: #00ff00;
+        }
+
+        .btn.primary:hover {
+            background: #00cc00;
+        }
+
+        .status-panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00cc00);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .results-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: none;
+        }
+
+        .results-section.show {
+            display: block;
+        }
+
+        .file-info {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .download-btn {
+            background: #00ff00;
+            color: #000;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: #00cc00;
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 255, 0, 0.3);
+        }
+
+        .error-message {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid rgba(255, 0, 0, 0.5);
+            color: #ff6b6b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .preview-images {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .scanning-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            z-index: 1000;
+            display: none;
+        }
+
+        .scanning-indicator.show {
+            display: block;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .instruction-panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #00ff00;
+        }
+
+        .instruction-panel h3 {
+            margin-bottom: 10px;
+            color: #00ff00;
+        }
+
+        .instruction-panel ol {
+            padding-left: 20px;
+        }
+
+        .instruction-panel li {
+            margin-bottom: 5px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 离线 Cimbar 扫描器</h1>
+            <p>使用摄像头扫描或上传文件来解码 Cimbar 条码</p>
+        </div>
+
+        <div class="instruction-panel">
+            <h3>使用说明</h3>
+            <ol>
+                <li>使用左侧摄像头实时扫描 Cimbar 条码，或右侧上传图像文件</li>
+                <li>系统会自动识别并解码多个帧，直到完成文件重建</li>
+                <li>解码完成后，可以下载恢复的原始文件</li>
+                <li>支持完全离线使用，无需网络连接</li>
+            </ol>
+        </div>
+
+        <div class="scanner-container">
+            <!-- 摄像头扫描区域 -->
+            <div class="camera-section">
+                <h2 class="section-title">
+                    📹 摄像头扫描
+                </h2>
+                
+                <div class="video-container">
+                    <video id="video" autoplay muted playsinline></video>
+                    <div class="video-overlay" id="videoOverlay"></div>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                </div>
+
+                <div class="camera-controls">
+                    <button class="btn primary" id="startCameraBtn">启动摄像头</button>
+                    <button class="btn" id="stopCameraBtn" disabled>停止摄像头</button>
+                    <button class="btn" id="captureBtn" disabled>手动捕获</button>
+                    <button class="btn" id="switchCameraBtn" disabled>切换摄像头</button>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span>扫描状态:</span>
+                        <span id="scanStatus">未启动</span>
+                    </div>
+                    <div class="status-item">
+                        <span>已解码帧数:</span>
+                        <span id="decodedFrames">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span>解码进度:</span>
+                        <span id="decodeProgress">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 文件上传区域 -->
+            <div class="upload-section">
+                <h2 class="section-title">
+                    📁 文件上传
+                </h2>
+
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-text">拖拽文件到此处或点击选择</div>
+                    <div class="upload-subtext">支持 PNG、JPG、JPEG 格式的 Cimbar 帧图像</div>
+                    <input type="file" id="fileInput" accept="image/*" multiple>
+                </div>
+
+                <div class="camera-controls">
+                    <button class="btn" id="selectFilesBtn">选择文件</button>
+                    <button class="btn primary" id="decodeFilesBtn" disabled>解码文件</button>
+                    <button class="btn" id="clearFilesBtn">清空文件</button>
+                </div>
+
+                <div class="preview-images" id="previewImages"></div>
+
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span>已选择文件:</span>
+                        <span id="selectedFiles">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span>处理状态:</span>
+                        <span id="processStatus">等待中</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 进度指示器 -->
+        <div class="progress-bar" id="progressBar" style="display: none;">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <!-- 错误信息 -->
+        <div class="error-message" id="errorMessage"></div>
+
+        <!-- 结果显示区域 -->
+        <div class="results-section" id="resultsSection">
+            <h2 class="section-title">✅ 解码结果</h2>
+            <div class="file-info" id="fileInfo"></div>
+            <a href="#" class="download-btn" id="downloadBtn" style="display: none;">📥 下载文件</a>
+        </div>
+    </div>
+
+    <!-- 扫描指示器 -->
+    <div class="scanning-indicator" id="scanningIndicator">
+        🔍 正在扫描 Cimbar 条码...
+    </div>
+
+    <script>
+        class CimbarScanner {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.stream = null;
+                this.isScanning = false;
+                this.scanInterval = null;
+                this.selectedFiles = [];
+                this.decodedFrames = 0;
+                this.totalFramesNeeded = 10; // 估计需要的帧数
+                this.decodedData = null;
+                this.currentDeviceIndex = 0;
+                this.availableDevices = [];
+
+                this.init();
+            }
+
+            async init() {
+                this.bindEvents();
+                await this.getAvailableDevices();
+                this.updateStatus('就绪，点击启动摄像头开始扫描', 'info');
+                
+                // 检查是否支持 WebAssembly
+                if (typeof WebAssembly === 'undefined') {
+                    this.showError('您的浏览器不支持 WebAssembly，某些功能可能无法使用');
+                }
+            }
+
+            bindEvents() {
+                // 摄像头控制
+                document.getElementById('startCameraBtn').addEventListener('click', () => this.startCamera());
+                document.getElementById('stopCameraBtn').addEventListener('click', () => this.stopCamera());
+                document.getElementById('captureBtn').addEventListener('click', () => this.manualCapture());
+                document.getElementById('switchCameraBtn').addEventListener('click', () => this.switchCamera());
+
+                // 文件上传
+                const uploadArea = document.getElementById('uploadArea');
+                const fileInput = document.getElementById('fileInput');
+                
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('dragover');
+                });
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('dragover');
+                });
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    this.handleFiles(Array.from(e.dataTransfer.files));
+                });
+
+                fileInput.addEventListener('change', (e) => {
+                    this.handleFiles(Array.from(e.target.files));
+                });
+
+                document.getElementById('selectFilesBtn').addEventListener('click', () => fileInput.click());
+                document.getElementById('decodeFilesBtn').addEventListener('click', () => this.decodeFiles());
+                document.getElementById('clearFilesBtn').addEventListener('click', () => this.clearFiles());
+            }
+
+            async getAvailableDevices() {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    this.availableDevices = devices.filter(device => device.kind === 'videoinput');
+                    
+                    if (this.availableDevices.length > 1) {
+                        document.getElementById('switchCameraBtn').disabled = false;
+                    }
+                } catch (error) {
+                    console.warn('无法获取摄像头设备列表:', error);
+                }
+            }
+
+            async startCamera() {
+                try {
+                    const constraints = {
+                        video: {
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            facingMode: 'environment' // 优先使用后置摄像头
+                        }
+                    };
+
+                    // 如果指定了设备，使用该设备
+                    if (this.availableDevices.length > 0) {
+                        constraints.video.deviceId = this.availableDevices[this.currentDeviceIndex].deviceId;
+                    }
+
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.video.srcObject = this.stream;
+
+                    // 等待视频加载
+                    await new Promise((resolve) => {
+                        this.video.onloadedmetadata = resolve;
+                    });
+
+                    // 设置canvas尺寸
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+
+                    // 更新UI
+                    document.getElementById('startCameraBtn').disabled = true;
+                    document.getElementById('stopCameraBtn').disabled = false;
+                    document.getElementById('captureBtn').disabled = false;
+                    
+                    if (this.availableDevices.length > 1) {
+                        document.getElementById('switchCameraBtn').disabled = false;
+                    }
+
+                    // 开始自动扫描
+                    this.startScanning();
+                    this.updateScanStatus('摄像头已启动，正在扫描...');
+
+                } catch (error) {
+                    this.showError('无法启动摄像头: ' + error.message);
+                }
+            }
+
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+
+                this.stopScanning();
+                
+                // 更新UI
+                document.getElementById('startCameraBtn').disabled = false;
+                document.getElementById('stopCameraBtn').disabled = true;
+                document.getElementById('captureBtn').disabled = true;
+                document.getElementById('switchCameraBtn').disabled = true;
+
+                this.updateScanStatus('摄像头已停止');
+            }
+
+            async switchCamera() {
+                if (this.availableDevices.length <= 1) return;
+
+                this.currentDeviceIndex = (this.currentDeviceIndex + 1) % this.availableDevices.length;
+                
+                if (this.stream) {
+                    this.stopCamera();
+                    await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟
+                    this.startCamera();
+                }
+            }
+
+            startScanning() {
+                this.isScanning = true;
+                document.getElementById('scanningIndicator').classList.add('show');
+                document.getElementById('videoOverlay').classList.add('scanning');
+
+                this.scanInterval = setInterval(() => {
+                    this.captureAndDecode();
+                }, 500); // 每500ms扫描一次
+            }
+
+            stopScanning() {
+                this.isScanning = false;
+                document.getElementById('scanningIndicator').classList.remove('show');
+                document.getElementById('videoOverlay').classList.remove('scanning');
+
+                if (this.scanInterval) {
+                    clearInterval(this.scanInterval);
+                    this.scanInterval = null;
+                }
+            }
+
+            manualCapture() {
+                this.captureAndDecode();
+            }
+
+            async captureAndDecode() {
+                if (!this.video.videoWidth || !this.video.videoHeight) return;
+
+                // 绘制当前帧到canvas
+                this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+                
+                // 获取图像数据
+                const imageData = this.canvas.toDataURL('image/png');
+                
+                // 解码图像
+                await this.decodeImage(imageData);
+            }
+
+            async decodeImage(imageData) {
+                try {
+                    // 这里应该调用实际的 Cimbar 解码器
+                    // 目前使用模拟解码器
+                    const result = await this.mockDecode(imageData);
+                    
+                    if (result.success) {
+                        this.decodedFrames++;
+                        this.updateDecodedFrames();
+                        
+                        // 更新视觉反馈
+                        document.getElementById('videoOverlay').classList.add('success');
+                        setTimeout(() => {
+                            document.getElementById('videoOverlay').classList.remove('success');
+                        }, 200);
+
+                        if (result.complete) {
+                            this.onDecodeComplete(result.data);
+                        }
+                    }
+                } catch (error) {
+                    console.warn('解码失败:', error);
+                }
+            }
+
+            // 模拟解码器 - 实际应该替换为 WebAssembly 解码器
+            async mockDecode(imageData) {
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        // 模拟随机成功率
+                        const success = Math.random() > 0.7;
+                        
+                        if (success) {
+                            const complete = this.decodedFrames >= this.totalFramesNeeded - 1;
+                            resolve({
+                                success: true,
+                                complete: complete,
+                                data: complete ? this.generateMockFile() : null
+                            });
+                        } else {
+                            resolve({ success: false });
+                        }
+                    }, 100);
+                });
+            }
+
+            generateMockFile() {
+                // 生成模拟文件数据
+                const content = `这是通过 Cimbar 解码的示例文件\n解码时间: ${new Date().toLocaleString()}\n解码帧数: ${this.decodedFrames + 1}`;
+                return new Blob([content], { type: 'text/plain' });
+            }
+
+            onDecodeComplete(data) {
+                this.decodedData = data;
+                this.stopScanning();
+                
+                // 显示结果
+                this.showResults();
+                this.updateScanStatus('解码完成！');
+                
+                // 创建下载链接
+                this.createDownloadLink(data);
+            }
+
+            handleFiles(files) {
+                const imageFiles = files.filter(file => file.type.startsWith('image/'));
+                
+                if (imageFiles.length === 0) {
+                    this.showError('请选择有效的图像文件');
+                    return;
+                }
+
+                this.selectedFiles = [...this.selectedFiles, ...imageFiles];
+                this.updateSelectedFiles();
+                this.showPreviews(imageFiles);
+                
+                document.getElementById('decodeFilesBtn').disabled = false;
+            }
+
+            showPreviews(files) {
+                const container = document.getElementById('previewImages');
+                
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'preview-image';
+                        img.title = file.name;
+                        container.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            async decodeFiles() {
+                if (this.selectedFiles.length === 0) return;
+
+                this.showProgress();
+                this.updateProcessStatus('正在处理...');
+
+                try {
+                    for (let i = 0; i < this.selectedFiles.length; i++) {
+                        const file = this.selectedFiles[i];
+                        
+                        // 将文件转换为图像数据
+                        const imageData = await this.fileToDataURL(file);
+                        
+                        // 解码图像
+                        await this.decodeImage(imageData);
+                        
+                        // 更新进度
+                        const progress = ((i + 1) / this.selectedFiles.length) * 100;
+                        this.updateProgress(progress);
+                    }
+
+                    this.updateProcessStatus('处理完成');
+                    
+                    if (this.decodedData) {
+                        this.showResults();
+                        this.createDownloadLink(this.decodedData);
+                    } else {
+                        this.showError('未能从上传的图像中解码出有效数据，请尝试上传更多帧或检查图像质量');
+                    }
+
+                } catch (error) {
+                    this.showError('处理文件时出错: ' + error.message);
+                } finally {
+                    this.hideProgress();
+                }
+            }
+
+            fileToDataURL(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            clearFiles() {
+                this.selectedFiles = [];
+                document.getElementById('fileInput').value = '';
+                document.getElementById('previewImages').innerHTML = '';
+                document.getElementById('decodeFilesBtn').disabled = true;
+                this.updateSelectedFiles();
+                this.updateProcessStatus('等待中');
+                this.hideResults();
+            }
+
+            createDownloadLink(data) {
+                const url = URL.createObjectURL(data);
+                const downloadBtn = document.getElementById('downloadBtn');
+                
+                downloadBtn.href = url;
+                downloadBtn.download = `decoded_file_${Date.now()}.txt`;
+                downloadBtn.style.display = 'inline-block';
+                
+                // 清理URL对象
+                downloadBtn.addEventListener('click', () => {
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                });
+            }
+
+            showResults() {
+                const resultsSection = document.getElementById('resultsSection');
+                const fileInfo = document.getElementById('fileInfo');
+                
+                fileInfo.innerHTML = `
+                    <h4>解码信息:</h4>
+                    <p><strong>解码时间:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>解码帧数:</strong> ${this.decodedFrames}</p>
+                    <p><strong>文件大小:</strong> ${this.decodedData?.size || 0} 字节</p>
+                    <p><strong>状态:</strong> ✅ 解码成功</p>
+                `;
+                
+                resultsSection.classList.add('show');
+            }
+
+            hideResults() {
+                document.getElementById('resultsSection').classList.remove('show');
+                document.getElementById('downloadBtn').style.display = 'none';
+            }
+
+            showProgress() {
+                document.getElementById('progressBar').style.display = 'block';
+            }
+
+            hideProgress() {
+                document.getElementById('progressBar').style.display = 'none';
+                this.updateProgress(0);
+            }
+
+            updateProgress(percent) {
+                document.getElementById('progressFill').style.width = percent + '%';
+            }
+
+            updateScanStatus(status) {
+                document.getElementById('scanStatus').textContent = status;
+            }
+
+            updateProcessStatus(status) {
+                document.getElementById('processStatus').textContent = status;
+            }
+
+            updateDecodedFrames() {
+                document.getElementById('decodedFrames').textContent = this.decodedFrames;
+                const progress = Math.min((this.decodedFrames / this.totalFramesNeeded) * 100, 100);
+                document.getElementById('decodeProgress').textContent = Math.round(progress) + '%';
+            }
+
+            updateSelectedFiles() {
+                document.getElementById('selectedFiles').textContent = this.selectedFiles.length;
+            }
+
+            showError(message) {
+                const errorEl = document.getElementById('errorMessage');
+                errorEl.textContent = message;
+                errorEl.classList.add('show');
+                
+                setTimeout(() => {
+                    errorEl.classList.remove('show');
+                }, 5000);
+            }
+
+            updateStatus(message, type) {
+                // 通用状态更新方法
+                console.log(`[${type}] ${message}`);
+            }
+        }
+
+        // 初始化扫描器
+        document.addEventListener('DOMContentLoaded', () => {
+            new CimbarScanner();
+        });
+
+        // Service Worker 注册（用于离线支持）
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch(registrationError => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
